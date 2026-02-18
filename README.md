@@ -2,6 +2,10 @@
 
 FastAPI service for receiving payment transaction webhooks, acknowledging immediately, and processing reliably in the background with idempotency.
 
+This service is deployed on **Render (free tier)**.  
+Free tier instances can go idle and need a cold start when the first request arrives.  
+Because of that, the first hit after inactivity may be slower while the server wakes up.
+
 ## What This Project Does
 
 - Accepts transaction webhook requests at `POST /v1/webhooks/transactions`
@@ -45,8 +49,10 @@ Response:
 
 ```json
 {
+  "status_code": 202,
   "acknowledged": true,
-  "transaction_id": "txn_abc123def456"
+  "transaction_id": "txn_abc123def456",
+  "response_time_ms": 42.317
 }
 ```
 
@@ -97,6 +103,13 @@ Returns persisted transaction status and timestamps.
 - Alembic
 - Pytest
 - Docker / Docker Compose
+
+## Response Time Tracking (Highlighted)
+
+- Webhook ACK response includes `response_time_ms` for observability.
+- Measurement is taken inside API handler using high-resolution monotonic timer.
+- Optimized hot path reduces DB round-trips for first-time webhook inserts.
+- Note: strict always-`<500ms` cannot be guaranteed on free-tier cold starts or network spikes.
 
 ## Run Locally (Supabase Postgres + local API)
 
