@@ -16,6 +16,7 @@ engine = create_engine(
     pool_size=10,
     max_overflow=20,
     pool_recycle=1800,
+    connect_args={"options": f"-c timezone={settings.db_timezone}"},
 )
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False)
 

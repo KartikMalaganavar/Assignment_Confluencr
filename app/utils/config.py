@@ -7,6 +7,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/confluencr"
     db_auto_create: bool = True
+    db_timezone: str = "Asia/Kolkata"
     processing_delay_seconds: int = 30
     processing_stale_timeout_seconds: int = 120
     log_level: str = "INFO"
@@ -23,6 +24,13 @@ class Settings(BaseSettings):
     def validate_stale_timeout(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("PROCESSING_STALE_TIMEOUT_SECONDS must be > 0")
+        return value
+
+    @field_validator("db_timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("DB_TIMEZONE must be a non-empty timezone name")
         return value
 
 

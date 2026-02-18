@@ -1,7 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
+from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, DateTime, Enum, Integer, Numeric, String, Text, func
+from sqlalchemy import DateTime, Enum, Integer, Numeric, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.utils.db import Base
@@ -11,7 +13,7 @@ from app.utils.enums import TransactionStatus
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     transaction_id: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
     source_account: Mapped[str] = mapped_column(String(128), nullable=False)
     destination_account: Mapped[str] = mapped_column(String(128), nullable=False)

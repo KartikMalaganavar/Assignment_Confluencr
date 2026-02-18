@@ -32,7 +32,7 @@ def upgrade() -> None:
 
     op.create_table(
         "transactions",
-        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("transaction_id", sa.String(length=128), nullable=False),
         sa.Column("source_account", sa.String(length=128), nullable=False),
         sa.Column("destination_account", sa.String(length=128), nullable=False),

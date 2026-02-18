@@ -96,6 +96,7 @@ Returns persisted transaction status and timestamps.
 
 ## Tech Stack
 
+- Python 3.11.0
 - FastAPI
 - Pydantic v2
 - SQLAlchemy 2.x ORM
@@ -110,6 +111,29 @@ Returns persisted transaction status and timestamps.
 - Measurement is taken inside API handler using high-resolution monotonic timer.
 - Optimized hot path reduces DB round-trips for first-time webhook inserts.
 - Note: strict always-`<500ms` cannot be guaranteed on free-tier cold starts or network spikes.
+
+## Timezone Behavior
+
+- API response payload timestamps are returned in **IST** (`Asia/Kolkata`).
+- PostgreSQL stores `TIMESTAMPTZ` values as absolute instants (canonical UTC storage semantics).
+- This means displayed payload time is IST, while DB internally preserves timezone-safe UTC instant values.
+
+## SQL Schema Details
+
+- SQL schema file: `sql/transactions_schema.sql`
+- Includes:
+  - `transaction_status` enum (`PROCESSING`, `PROCESSED`, `FAILED`)
+  - `transactions` table with UUID primary key (`gen_random_uuid()`)
+  - indexes for `transaction_id`, `status`, and `(status, processing_started_at)`
+  - trigger to auto-update `updated_at` on row updates
+
+Apply schema manually (optional):
+
+```bash
+psql "<YOUR_DATABASE_URL>" -f sql/transactions_schema.sql
+```
+
+Use this path if you prefer SQL-first setup over Alembic.
 
 ## Run Locally (Supabase Postgres + local API)
 
