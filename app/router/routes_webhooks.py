@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from time import perf_counter_ns
 
 from app.utils.config import settings
 from app.utils.db import get_db
@@ -25,8 +26,9 @@ def receive_transaction_webhook(
     background_tasks: BackgroundTasks,
     service: WebhookService = Depends(get_service),
 ) -> TransactionWebhookAck:
+    started_ns = perf_counter_ns()
     try:
-        transaction, should_schedule = service.ingest_transaction_webhook(payload)
+        transaction_id, should_schedule = service.ingest_transaction_webhook(payload)
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable") from exc
 
@@ -34,8 +36,13 @@ def receive_transaction_webhook(
         # Schedule async processing after immediate 202 acknowledgement.
         background_tasks.add_task(
             process_transaction_background,
-            transaction_id=transaction.transaction_id,
+            transaction_id=transaction_id,
             processing_delay_seconds=settings.processing_delay_seconds,
         )
 
-    return TransactionWebhookAck( transaction_id=transaction.transaction_id, status_code=202)
+    elapsed_ms = (perf_counter_ns() - started_ns) / 1_000_000
+    return TransactionWebhookAck(
+        transaction_id=transaction_id,
+        status_code=202,
+        response_time_ms=round(elapsed_ms, 3),
+    )

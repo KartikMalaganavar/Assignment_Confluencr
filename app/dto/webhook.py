@@ -22,3 +22,4 @@ class TransactionWebhookAck(BaseModel):
     status_code: int = 202
     acknowledged: bool = True
     transaction_id: str
+    response_time_ms: float

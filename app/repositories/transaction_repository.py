@@ -24,7 +24,7 @@ class TransactionRepository:
         status: TransactionStatus,
         processing_started_at: datetime,
         payload_hash: str,
-    ) -> Transaction | None:
+    ) -> str | None:
         # Use INSERT ... ON CONFLICT DO NOTHING for idempotent ingestion.
         insert_stmt = (
             pg_insert(Transaction)
@@ -39,13 +39,13 @@ class TransactionRepository:
                 payload_hash=payload_hash,
             )
             .on_conflict_do_nothing(index_elements=["transaction_id"])
-            .returning(Transaction.id)
+            .returning(Transaction.transaction_id)
         )
-        inserted_id = self.db.execute(insert_stmt).scalar_one_or_none()
-        if inserted_id is None:
+        inserted_transaction_id = self.db.execute(insert_stmt).scalar_one_or_none()
+        if inserted_transaction_id is None:
             return None
         self.db.commit()
-        return self.db.get(Transaction, inserted_id)
+        return inserted_transaction_id
 
     def get_by_transaction_id(self, transaction_id: str) -> Transaction | None:
         return self.db.execute(
@@ -90,6 +90,7 @@ class TransactionRepository:
 
     def mark_processed(self, transaction: Transaction, *, processed_at: datetime) -> None:
         transaction.status = TransactionStatus.PROCESSED
+        print("processing complete, setting processed_at to", processed_at)
         transaction.processed_at = processed_at
         transaction.error_message = None
         self.db.commit()

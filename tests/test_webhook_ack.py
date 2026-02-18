@@ -17,5 +17,6 @@ def test_webhook_ack_is_202_and_fast(client):
 
     assert response.status_code == 202
     assert response.json()["acknowledged"] is True
+    assert response.json()["response_time_ms"] >= 0
     # TestClient waits for BackgroundTasks to complete, unlike a real network client.
     assert elapsed < (settings.processing_delay_seconds + 0.5)

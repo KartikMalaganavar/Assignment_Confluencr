@@ -4,7 +4,6 @@ from app.utils.config import settings
 from app.utils.enums import TransactionStatus
 from app.utils.time import utcnow
 from app.dto.webhook import TransactionWebhookIn
-from app.models.transaction import Transaction
 from app.repositories.transaction_repository import TransactionRepository
 from app.utils.idempotency import payload_hash
 
@@ -16,7 +15,7 @@ class WebhookService:
     def __init__(self, db: Session):
         self.repository = TransactionRepository(db)
 
-    def ingest_transaction_webhook(self, payload: TransactionWebhookIn) -> tuple[Transaction, bool]:
+    def ingest_transaction_webhook(self, payload: TransactionWebhookIn) -> tuple[str, bool]:
         # Hashing lets us distinguish true duplicates from conflicting duplicates.
         payload_digest = payload_hash(payload)
         now = utcnow()
@@ -56,4 +55,4 @@ class WebhookService:
             now=now,
             stale_timeout_seconds=settings.processing_stale_timeout_seconds,
         )
-        return existing, should_schedule
+        return existing.transaction_id, should_schedule
