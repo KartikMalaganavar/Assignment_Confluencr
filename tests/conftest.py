@@ -1,27 +1,32 @@
+import asyncio
 import os
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.utils import db as db_core
 from app.utils.config import settings
 from app.models.transaction import Transaction  # noqa: F401
 
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg2://postgres:postgres@localhost:5432/confluencr",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/confluencr",
 )
 
 
 @pytest.fixture(scope="session")
 def test_engine():
-    engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+    # NullPool avoids cross-event-loop connection reuse in Windows test runs.
+    engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True, poolclass=NullPool)
     db_core.engine = engine
-    db_core.SessionLocal = sessionmaker(
+    db_core.SessionLocal = async_sessionmaker(
         bind=engine,
-        autocommit=False,
         autoflush=False,
         expire_on_commit=False,
     )
@@ -31,10 +36,19 @@ def test_engine():
 
 @pytest.fixture(autouse=True)
 def setup_database(test_engine):
-    db_core.Base.metadata.drop_all(bind=test_engine)
-    db_core.Base.metadata.create_all(bind=test_engine)
+    async def _setup() -> None:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(db_core.Base.metadata.drop_all)
+            await conn.run_sync(db_core.Base.metadata.create_all)
+
+    async def _teardown() -> None:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(db_core.Base.metadata.drop_all)
+
+    asyncio.run(_setup())
     yield
-    db_core.Base.metadata.drop_all(bind=test_engine)
+    asyncio.run(_teardown())
+    asyncio.run(test_engine.dispose())
 
 
 @pytest.fixture

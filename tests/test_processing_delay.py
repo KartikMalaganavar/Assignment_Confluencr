@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from sqlalchemy import select
@@ -33,10 +34,13 @@ def test_transaction_gets_processed_after_delay(client):
 
     elapsed = time.perf_counter() - start
     if final_status == "FAILED":
-        with db_core.SessionLocal() as db:
-            tx = db.execute(
-                select(Transaction).where(Transaction.transaction_id == "txn_delay_1")
-            ).scalar_one()
-            raise AssertionError(f"processing failed: {tx.error_message}")
+        async def _load_error() -> str | None:
+            async with db_core.SessionLocal() as db:
+                tx = (await db.execute(
+                    select(Transaction).where(Transaction.transaction_id == "txn_delay_1")
+                )).scalar_one()
+                return tx.error_message
+
+        raise AssertionError(f"processing failed: {asyncio.run(_load_error())}")
     assert final_status == "PROCESSED"
     assert elapsed >= 2

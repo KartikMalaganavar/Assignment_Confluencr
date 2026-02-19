@@ -1,18 +1,21 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+import asyncio
+import logging
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from time import perf_counter_ns
 
 from app.utils.config import settings
 from app.utils.db import get_db
 from app.dto.webhook import TransactionWebhookAck, TransactionWebhookIn
-from app.services.processor import process_transaction_background
+from app.services.processor import schedule_transaction_processing
 from app.services.webhook_service import WebhookService
 
 router = APIRouter(prefix="/v1/webhooks", tags=["webhooks"])
+logger = logging.getLogger(__name__)
 
 
-def get_service(db: Session = Depends(get_db)) -> WebhookService:
+def get_service(db: AsyncSession = Depends(get_db)) -> WebhookService:
     return WebhookService(db)
 
 
@@ -21,21 +24,26 @@ def get_service(db: Session = Depends(get_db)) -> WebhookService:
     response_model=TransactionWebhookAck,
     status_code=status.HTTP_202_ACCEPTED,
 )
-def receive_transaction_webhook(
+async def receive_transaction_webhook(
     payload: TransactionWebhookIn,
-    background_tasks: BackgroundTasks,
     service: WebhookService = Depends(get_service),
 ) -> TransactionWebhookAck:
     started_ns = perf_counter_ns()
     try:
-        transaction_id, should_schedule = service.ingest_transaction_webhook(payload)
+        transaction_id, should_schedule = await asyncio.wait_for(
+            service.ingest_transaction_webhook(payload),
+            timeout=settings.db_operation_timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        logger.exception("Webhook ingest timed out")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database operation timed out") from exc
     except SQLAlchemyError as exc:
+        logger.exception("Webhook ingest DB error")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable") from exc
 
     if should_schedule:
-        # Schedule async processing after immediate 202 acknowledgement.
-        background_tasks.add_task(
-            process_transaction_background,
+        # Fire-and-forget scheduling keeps webhook ACK independent from long processing.
+        schedule_transaction_processing(
             transaction_id=transaction_id,
             processing_delay_seconds=settings.processing_delay_seconds,
         )

@@ -3,17 +3,17 @@ from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.enums import TransactionStatus
 from app.models.transaction import Transaction
 
 
 class TransactionRepository:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def create_if_not_exists(
+    async def create_if_not_exists(
         self,
         *,
         transaction_id: str,
@@ -41,24 +41,24 @@ class TransactionRepository:
             .on_conflict_do_nothing(index_elements=["transaction_id"])
             .returning(Transaction.transaction_id)
         )
-        inserted_transaction_id = self.db.execute(insert_stmt).scalar_one_or_none()
+        inserted_transaction_id = (await self.db.execute(insert_stmt)).scalar_one_or_none()
         if inserted_transaction_id is None:
             return None
-        self.db.commit()
+        await self.db.commit()
         return inserted_transaction_id
 
-    def get_by_transaction_id(self, transaction_id: str) -> Transaction | None:
-        return self.db.execute(
+    async def get_by_transaction_id(self, transaction_id: str) -> Transaction | None:
+        return (await self.db.execute(
             select(Transaction).where(Transaction.transaction_id == transaction_id)
-        ).scalar_one_or_none()
+        )).scalar_one_or_none()
 
-    def record_duplicate_conflict(self, transaction: Transaction, *, now: datetime) -> None:
+    async def record_duplicate_conflict(self, transaction: Transaction, *, now: datetime) -> None:
         transaction.duplicate_conflict_count += 1
         transaction.last_conflict_at = now
-        self.db.commit()
+        await self.db.commit()
 
 
-    def mark_for_retry_if_stale(
+    async def mark_for_retry_if_stale(
         self,
         transaction: Transaction,
         *,
@@ -74,28 +74,27 @@ class TransactionRepository:
         if transaction.processing_started_at is None or transaction.processing_started_at < stale_cutoff:
             transaction.processing_started_at = now
             transaction.error_message = None
-            self.db.commit()
+            await self.db.commit()
             return True
         return False
 
-    def ensure_processing_started(self, transaction: Transaction, *, now: datetime) -> None:
+    async def ensure_processing_started(self, transaction: Transaction, *, now: datetime) -> None:
         if transaction.processing_started_at is None:
             transaction.processing_started_at = now
-            self.db.commit()
+            await self.db.commit()
 
-    def mark_interrupted(self, transaction: Transaction, *, message: str) -> None:
+    async def mark_interrupted(self, transaction: Transaction, *, message: str) -> None:
         transaction.processing_started_at = None
         transaction.error_message = message
-        self.db.commit()
+        await self.db.commit()
 
-    def mark_processed(self, transaction: Transaction, *, processed_at: datetime) -> None:
+    async def mark_processed(self, transaction: Transaction, *, processed_at: datetime) -> None:
         transaction.status = TransactionStatus.PROCESSED
-        print("processing complete, setting processed_at to", processed_at)
         transaction.processed_at = processed_at
         transaction.error_message = None
-        self.db.commit()
+        await self.db.commit()
 
-    def mark_failed(self, transaction: Transaction, *, error_message: str) -> None:
+    async def mark_failed(self, transaction: Transaction, *, error_message: str) -> None:
         transaction.status = TransactionStatus.FAILED
         transaction.error_message = error_message
-        self.db.commit()
+        await self.db.commit()

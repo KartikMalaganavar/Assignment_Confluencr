@@ -7,5 +7,5 @@ router = APIRouter()
 
 
 @router.get("/", response_model=HealthResponse)
-def health_check() -> HealthResponse:
+async def health_check() -> HealthResponse:
     return HealthResponse(status="HEALTHY", current_time=utcnow())

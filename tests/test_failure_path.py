@@ -18,9 +18,9 @@ async def test_processing_failure_marks_transaction_failed(test_engine):
         status=TransactionStatus.PROCESSING,
         payload_hash="abc",
     )
-    with db_core.SessionLocal() as db:
+    async with db_core.SessionLocal() as db:
         db.add(tx)
-        db.commit()
+        await db.commit()
 
     await process_transaction_background(
         transaction_id="txn_fail_1",
@@ -28,9 +28,9 @@ async def test_processing_failure_marks_transaction_failed(test_engine):
         fail_for_testing=True,
     )
 
-    with db_core.SessionLocal() as db:
-        updated = db.execute(
+    async with db_core.SessionLocal() as db:
+        updated = (await db.execute(
             select(Transaction).where(Transaction.transaction_id == "txn_fail_1")
-        ).scalar_one()
+        )).scalar_one()
         assert updated.status == TransactionStatus.FAILED
         assert updated.error_message is not None

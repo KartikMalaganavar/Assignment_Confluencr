@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import select
 
 from app.utils import db as db_core
@@ -25,10 +27,13 @@ def test_conflicting_duplicate_keeps_original_and_tracks_conflict(client):
     assert response_1.status_code == 202
     assert response_2.status_code == 202
 
-    with db_core.SessionLocal() as db:
-        tx = db.execute(
-            select(Transaction).where(Transaction.transaction_id == "txn_conflict_1")
-        ).scalar_one()
-        assert float(tx.amount) == 1500.0
-        assert tx.duplicate_conflict_count == 1
-        assert tx.last_conflict_at is not None
+    async def _assert_db_state() -> None:
+        async with db_core.SessionLocal() as db:
+            tx = (await db.execute(
+                select(Transaction).where(Transaction.transaction_id == "txn_conflict_1")
+            )).scalar_one()
+            assert float(tx.amount) == 1500.0
+            assert tx.duplicate_conflict_count == 1
+            assert tx.last_conflict_at is not None
+
+    asyncio.run(_assert_db_state())

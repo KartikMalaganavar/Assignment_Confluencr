@@ -140,7 +140,7 @@ Use this path if you prefer SQL-first setup over Alembic.
 ### 1. Create `.env`
 
 ```env
-DATABASE_URL=postgresql+psycopg2://postgres.<project_ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql+asyncpg://postgres.<project_ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
 PROCESSING_DELAY_SECONDS=30
 PROCESSING_STALE_TIMEOUT_SECONDS=120
 LOG_LEVEL=INFO

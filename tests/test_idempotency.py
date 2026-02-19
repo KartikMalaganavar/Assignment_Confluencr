@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from sqlalchemy import select
@@ -26,9 +27,12 @@ def test_same_payload_duplicate_only_processes_once(client):
             break
         time.sleep(0.2)
 
-    with db_core.SessionLocal() as db:
-        rows = db.execute(
-            select(Transaction).where(Transaction.transaction_id == "txn_same_1")
-        ).scalars().all()
-        assert len(rows) == 1
-        assert rows[0].duplicate_conflict_count == 0
+    async def _assert_db_state() -> None:
+        async with db_core.SessionLocal() as db:
+            rows = (await db.execute(
+                select(Transaction).where(Transaction.transaction_id == "txn_same_1")
+            )).scalars().all()
+            assert len(rows) == 1
+            assert rows[0].duplicate_conflict_count == 0
+
+    asyncio.run(_assert_db_state())

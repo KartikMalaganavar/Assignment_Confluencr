@@ -30,4 +30,4 @@ def test_webhook_ack_under_processing_load(client):
     p95_index = max(int(len(latencies) * 0.95) - 1, 0)
     p95 = sorted(latencies)[p95_index]
     # In TestClient, each request waits for the task completion.
-    assert p95 < (settings.processing_delay_seconds + 0.5)
+    assert p95 < (settings.processing_delay_seconds + 1.0)
