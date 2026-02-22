@@ -57,7 +57,28 @@ Response:
 ```
 
 ### `GET /v1/transactions/{transaction_id}`
-Returns persisted transaction status and timestamps.
+Returns a list of transaction objects for the given `transaction_id`.
+
+Response example:
+
+```json
+[
+  {
+    "transaction_id": "txn_abc123def456",
+    "source_account": "acc_user_789",
+    "destination_account": "acc_merchant_456",
+    "amount": 1500,
+    "currency": "INR",
+    "status": "PROCESSED",
+    "created_at": "2026-02-18T20:14:55.123+05:30",
+    "processed_at": "2026-02-18T20:15:25.456+05:30"
+  }
+]
+```
+
+Notes:
+- `200 OK` with a JSON array response.
+- Empty array means no matching transaction found.
 
 ## Project Modules and Use Cases
 
