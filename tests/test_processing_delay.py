@@ -27,7 +27,9 @@ def test_transaction_gets_processed_after_delay(client):
     while time.time() < deadline:
         query_resp = client.get("/v1/transactions/txn_delay_1")
         assert query_resp.status_code == 200
-        final_status = query_resp.json()["status"]
+        body = query_resp.json()
+        assert isinstance(body, list)
+        final_status = body[0]["status"] if body else None
         if final_status == "PROCESSED":
             break
         time.sleep(0.2)

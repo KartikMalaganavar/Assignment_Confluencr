@@ -54,6 +54,11 @@ class TransactionRepository:
         transactions = result.scalars().all()
         return transactions
 
+    async def get_one_by_transaction_id(self, transaction_id: str) -> Transaction | None:
+        stmt = select(Transaction).where(Transaction.transaction_id == transaction_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def record_duplicate_conflict(self, transaction: Transaction, *, now: datetime) -> None:
         transaction.duplicate_conflict_count += 1
         transaction.last_conflict_at = now

@@ -1,6 +1,7 @@
 def test_get_transaction_not_found(client):
     response = client.get("/v1/transactions/txn_missing")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_invalid_payload_rejected(client):

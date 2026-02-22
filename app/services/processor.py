@@ -22,6 +22,9 @@ def schedule_transaction_processing(transaction_id: str, processing_delay_second
     def _log_task_result(done_task: asyncio.Task) -> None:
         try:
             done_task.result()
+        except asyncio.CancelledError:
+            # Expected during graceful shutdown task draining.
+            return
         except Exception:  # noqa: BLE001
             logger.exception("Background processing task failed. transaction_id=%s", transaction_id)
 
@@ -34,7 +37,7 @@ async def process_transaction_background(
     shutdown_event = get_shutdown_event()
     async with db_core.SessionLocal() as db:
         repository = TransactionRepository(db)
-        transaction = await repository.get_by_transaction_id(transaction_id)
+        transaction = await repository.get_one_by_transaction_id(transaction_id)
         if transaction is None or transaction.status != TransactionStatus.PROCESSING:
             return
         # Stamp start time once so stale retries can be detected.
@@ -46,7 +49,7 @@ async def process_transaction_background(
             await asyncio.wait_for(shutdown_event.wait(), timeout=processing_delay_seconds)
             async with db_core.SessionLocal() as db:
                 repository = TransactionRepository(db)
-                transaction = await repository.get_by_transaction_id(transaction_id)
+                transaction = await repository.get_one_by_transaction_id(transaction_id)
                 if transaction is not None and transaction.status == TransactionStatus.PROCESSING:
                     # Leave row retryable when shutdown interrupts in-flight processing.
                     await repository.mark_interrupted(
@@ -62,7 +65,7 @@ async def process_transaction_background(
 
         async with db_core.SessionLocal() as db:
             repository = TransactionRepository(db)
-            transaction = await repository.get_by_transaction_id(transaction_id)
+            transaction = await repository.get_one_by_transaction_id(transaction_id)
             if transaction is None or transaction.status != TransactionStatus.PROCESSING:
                 return
             await repository.mark_processed(transaction, processed_at=utcnow())
@@ -70,7 +73,7 @@ async def process_transaction_background(
         # Persist failures to avoid silent drops and aid debugging.
         async with db_core.SessionLocal() as db:
             repository = TransactionRepository(db)
-            transaction = await repository.get_by_transaction_id(transaction_id)
+            transaction = await repository.get_one_by_transaction_id(transaction_id)
             if transaction is None or transaction.status != TransactionStatus.PROCESSING:
                 return
             await repository.mark_failed(transaction, error_message=str(exc))

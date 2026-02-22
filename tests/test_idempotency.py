@@ -23,7 +23,9 @@ def test_same_payload_duplicate_only_processes_once(client):
     while time.time() < deadline:
         query_resp = client.get("/v1/transactions/txn_same_1")
         assert query_resp.status_code == 200
-        if query_resp.json()["status"] == "PROCESSED":
+        body = query_resp.json()
+        assert isinstance(body, list)
+        if body and body[0]["status"] == "PROCESSED":
             break
         time.sleep(0.2)
 

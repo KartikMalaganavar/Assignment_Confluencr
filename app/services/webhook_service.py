@@ -34,7 +34,7 @@ class WebhookService:
         if created is not None:
             return created, True
 
-        existing = await self.repository.get_by_transaction_id(payload.transaction_id)
+        existing = await self.repository.get_one_by_transaction_id(payload.transaction_id)
         if existing is None:
             raise RuntimeError("transaction disappeared after conflict check")
 
