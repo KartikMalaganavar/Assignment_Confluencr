@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import List
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -47,10 +48,11 @@ class TransactionRepository:
         await self.db.commit()
         return inserted_transaction_id
 
-    async def get_by_transaction_id(self, transaction_id: str) -> Transaction | None:
-        return (await self.db.execute(
-            select(Transaction).where(Transaction.transaction_id == transaction_id)
-        )).scalar_one_or_none()
+    async def get_by_transaction_id(self, transaction_id: str) -> List[Transaction]:
+        stmt = select(Transaction).where(Transaction.transaction_id == transaction_id)
+        result = await self.db.execute(stmt)
+        transactions = result.scalars().all()
+        return transactions
 
     async def record_duplicate_conflict(self, transaction: Transaction, *, now: datetime) -> None:
         transaction.duplicate_conflict_count += 1
